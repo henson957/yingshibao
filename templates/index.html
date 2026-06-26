@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>盈时宝计时计费系统</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #333; padding-bottom: 32px; }
+
+  /* Nav */
+  .nav { display: flex; background: #fff; border-bottom: 1px solid #e8e8e8; position: sticky; top: 0; z-index: 100; }
+  .nav-item { flex: 1; text-align: center; padding: 14px 0; cursor: pointer; color: #999; font-size: 14px; transition: 0.2s; border-bottom: 2px solid transparent; user-select: none; }
+  .nav-item.active { color: #e74c3c; border-bottom-color: #e74c3c; font-weight: 600; }
+  .nav-item .icon { font-size: 20px; display: block; margin-bottom: 2px; }
+  .page { display: none; }
+
+  /* Main container */
+  .container { max-width: 960px; margin: 0 auto; padding: 12px; }
+
+  /* Dashboard */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .stat-card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .stat-card .label { font-size: 13px; color: #999; margin-bottom: 4px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; color: #333; }
+  .stat-card .value.red { color: #e74c3c; }
+  .stat-card .sub { font-size: 12px; color: #bbb; margin-top: 2px; }
+
+  /* Room grid */
+  .room-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  @media(min-width:600px){ .room-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media(min-width:800px){ .room-grid { grid-template-columns: repeat(4, 1fr); } }
+
+  .room-card { background: #fff; border-radius: 12px; padding: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); text-align: center; cursor: pointer; transition: 0.2s; position: relative; }
+  .room-card:active { transform: scale(0.97); }
+  .room-card .cat-badge { position: absolute; top: 8px; left: 8px; font-size: 11px; background: #e74c3c; color: #fff; padding: 2px 8px; border-radius: 4px; }
+  .room-card .menu-btn { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 16px; font-weight: 700; color: #999; cursor: pointer; user-select: none; z-index: 10; }
+	  .source-text { cursor: pointer; border-bottom: 1px dashed #ccc; }
+  .room-card .menu-btn:hover { background: #f0f0f0; color: #333; }
+  .card-menu { display: none; position: absolute; top: 32px; right: 8px; background: #fff; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 50; min-width: 100px; overflow: hidden; }
+  .card-menu.show { display: block; }
+  .card-menu div { padding: 10px 16px; font-size: 13px; cursor: pointer; text-align: left; white-space: nowrap; }
+  .card-menu div:hover { background: #f5f5f5; }
+  .card-menu .menu-del { color: #e74c3c; }
+  .add-card { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed #ddd; background: #fafafa; min-height: 160px; cursor: pointer; }
+  .add-card:hover { border-color: #e74c3c; background: #fef2f2; }
+  .add-card .icon { font-size: 40px; margin-bottom: 8px; }
+  .room-card .name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .room-card .status { font-size: 12px; padding: 2px 10px; border-radius: 10px; display: inline-block; margin-bottom: 8px; }
+  .room-card .status.idle { background: #e8f5e9; color: #2e7d32; }
+  .room-card .status.active { background: #fff3e0; color: #e65100; }
+  .room-card .status.overdue { background: #fce4ec; color: #c62828; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+  .room-card .countdown { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0; }
+  .room-card .countdown.normal { color: #e74c3c; }
+  .room-card .countdown.overdue { color: #c62828; animation: pulse 1s infinite; }
+  .room-card .elapsed-display { font-size: 16px; font-weight: 500; color: #888; margin-bottom: 2px; font-variant-numeric: tabular-nums; }
+  .room-card .time-info { font-size: 11px; color: #bbb; margin-bottom: 4px; }
+  .room-card .btn { display: block; width: 100%; padding: 10px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+  .room-card .btn:active { transform: scale(0.96); }
+  .room-card .btn.start { background: #27ae60; color: #fff; }
+  .room-card .btn.stop { background: #e74c3c; color: #fff; }
+  .room-card .btn.overdue-btn { background: #c62828; color: #fff; animation: pulse 1s infinite; }
+  .room-card .btn.extend-btn { background: #4a90d9; color: #fff; }
+  .room-card .btn.extend-btn:hover { background: #357abd; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; justify-content: center; align-items: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 24px; width: 90%; max-width: 380px; max-height: 90vh; overflow-y: auto; }
+  .modal h3 { font-size: 18px; margin-bottom: 16px; text-align: center; }
+  .modal .form-group { margin-bottom: 12px; }
+  .modal .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
+  .modal .form-group input, .modal .form-group select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; outline: none; }
+  .modal .form-group input:focus, .modal .form-group select:focus { border-color: #e74c3c; }
+  .modal .duration-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .modal .duration-btns button { padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; background: #fff; font-size: 15px; cursor: pointer; transition: 0.15s; }
+  .modal .duration-btns button.selected { border-color: #e74c3c; background: #fef2f2; color: #e74c3c; font-weight: 600; }
+  .modal .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+  .modal .modal-btns button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .modal .modal-btns .confirm { background: #e74c3c; color: #fff; }
+  .modal .modal-btns .cancel { background: #f0f0f0; color: #666; }
+
+  /* Income modal special */
+  .income-total { text-align: center; padding: 16px 0; }
+  .income-total .big { font-size: 36px; font-weight: 700; color: #e74c3c; }
+  .income-total .big input { width: 160px; font-size: 36px; font-weight: 700; border: none; border-bottom: 2px solid #e74c3c; text-align: center; outline: none; background: transparent; }
+
+  /* Records */
+  .records-list { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .record-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #f0f0f0; }
+  .record-item:last-child { border-bottom: none; }
+  .record-item .left { flex: 1; }
+  .record-item .left .name { font-size: 14px; font-weight: 500; }
+  .record-item .left .meta { font-size: 12px; color: #bbb; margin-top: 2px; }
+  .record-item .right { font-size: 18px; font-weight: 700; color: #e74c3c; }
+
+  /* Add buttons */
+  .fab-area { display: flex; gap: 8px; margin-bottom: 12px; }
+  .fab-area button { flex: 1; padding: 12px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .fab-area .add-income { background: #e74c3c; color: #fff; }
+  .fab-area .manage-rooms { background: #f0f0f0; color: #333; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; z-index: 300; opacity: 0; transition: 0.3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+
+  /* Room manage */
+  .room-edit-item { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .room-edit-item input, .room-edit-item select { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+  .room-edit-item .del-btn { background: #fce4ec; border: none; color: #c62828; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; font-size: 16px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<div class="nav" id="nav">
+  <div class="nav-item active" data-page="dashboard"><span class="icon">📊</span>首页</div>
+  <div class="nav-item" data-page="timing"><span class="icon">⏱</span>计时</div>
+  <div class="nav-item" data-page="records"><span class="icon">📋</span>记录</div>
+</div>
+
+<!-- Page: Dashboard -->
+<div class="page" id="page-dashboard" style="display:block">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">今日收入</div>
+        <div class="value red"><span id="dash-income">0</span></div>
+        <div class="sub" id="dash-income-detail">计时 ¥0 / 手动 ¥0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">今日单数</div>
+        <div class="value"><span id="dash-orders">0</span></div>
+        <div class="sub">已完成订单</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">当前计时</div>
+        <div class="value red"><span id="dash-active">0</span></div>
+        <div class="sub">进行中的计时</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">总收入</div>
+        <div class="value" id="dash-total-all">¥0</div>
+        <div class="sub"><a href="javascript:void(0)" onclick="switchPage('records')" style="color:#e74c3c;text-decoration:none">查看明细 →</a> · <a href="javascript:void(0)" onclick="exportData()" style="color:#4a90d9;text-decoration:none">📥 导出</a></div>
+      </div>
+    </div>
+
+    <div style="background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);margin-top:4px">
+      <h4 style="margin-bottom:12px;font-size:15px">今日收入来源</h4>
+      <div id="dash-breakdown" style="font-size:13px;color:#999">
+        <div style="text-align:center;padding:20px 0;color:#ccc">暂无收入记录</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+      <h4 style="margin-bottom:12px;font-size:15px">快捷操作</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button onclick="switchPage('timing')" style="padding:14px;border:none;border-radius:10px;background:#fff3e0;color:#e65100;font-size:15px;font-weight:600;cursor:pointer">⏱ 去计时</button>
+        <button onclick="showIncomeModal()" style="padding:14px;border:none;border-radius:10px;background:#fce4ec;color:#c62828;font-size:15px;font-weight:600;cursor:pointer">💰 记一笔收入</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Page: Timing -->
+<div class="page" id="page-timing">
+  <div class="container">
+    <div id="audio-status" style="display:none;background:#e8f5e9;color:#2e7d32;font-size:12px;padding:6px 12px;border-radius:6px;margin-bottom:8px;text-align:center">🔊 声音提醒已就绪</div>
+    <div class="room-grid" id="room-grid"></div>
+  </div>
+</div>
+
+<!-- Page: Records -->
+<div class="page" id="page-records">
+  <div class="container">
+    <div class="fab-area">
+      <button class="add-income" onclick="showIncomeModal()">💰 记一笔收入</button>
+      <button onclick="exportData()" style="background:#4a90d9;color:#fff;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap">📥 导出</button>
+    </div>
+    <div class="records-list" id="records-list">
+      <div style="text-align:center;padding:30px 0;color:#ccc">加载中...</div>
+    </div>
+    <div style="margin-top:16px;text-align:center;display:none" id="clear-btn">
+      <button onclick="clearExportedData()" style="padding:12px 24px;border:2px solid #e74c3c;border-radius:10px;background:#fff;color:#e74c3c;font-size:14px;font-weight:600;cursor:pointer">🗑 清空已导出数据</button>
+      <div style="font-size:11px;color:#bbb;margin-top:6px">请确认已导出并保存好文件再操作，此操作不可恢复</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Start Timer -->
+<div class="modal-overlay" id="modal-timer">
+  <div class="modal">
+    <h3 id="modal-timer-title">设置计时</h3>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button id="mode-countdown" class="confirm" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:#e74c3c;color:#fff">⏱ 倒计时</button>
+      <button id="mode-stopwatch" style="flex:1;padding:10px;border:2px solid#ddd;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:#666">⏱ 正计时</button>
+    </div>
+    <div id="countdown-options">
+      <div class="duration-btns" id="duration-btns">
+        <button data-min="30">30 分钟</button>
+        <button data-min="60" class="selected">1 小时</button>
+        <button data-min="120">2 小时</button>
+        <button data-min="180">3 小时</button>
+      </div>
+      <div class="form-group">
+        <label>自定义分钟</label>
+        <input type="number" id="custom-duration" min="1" placeholder="输入分钟数" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;outline:none">
+      </div>
+    </div>
+    <div id="stopwatch-hint" style="display:none;text-align:center;padding:16px 0;color:#888;font-size:14px">点击"开始计时"后，时间从 0 开始正着计，结束手动停止</div>
+    <div class="form-group">
+      <label>备注（可选）</label>
+      <input type="text" id="timer-note" placeholder="如：顾客信息、特殊要求等">
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeModal('modal-timer')">取消</button>
+      <button class="confirm" onclick="confirmStartTimer()">开始计时</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Extend Timer -->
+<div class="modal-overlay" id="modal-extend">
+  <div class="modal">
+    <h3 id="modal-extend-title">续时</h3>
+    <div class="duration-btns">
+      <button data-min="15">15 分钟</button>
+      <button data-min="30" class="selected">30 分钟</button>
+      <button data-min="60">1 小时</button>
+      <button data-min="120">2 小时</button>
+    </div>
+    <div class="form-group">
+      <label>自定义分钟</label>
+      <input type="number" id="extend-custom" min="1" placeholder="输入分钟数" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;outline:none">
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeModal('modal-extend')">取消</button>
+      <button class="confirm" onclick="confirmExtend()">续时</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Stop Timer / Enter Income -->
+<div class="modal-overlay" id="modal-income">
+  <div class="modal">
+    <h3 id="modal-income-title">计时结束</h3>
+    <div class="income-total">
+      <div style="font-size:48px;margin-bottom:8px" id="modal-income-icon">⏱</div>
+      <div style="font-size:14px;color:#666;margin-bottom:8px" id="modal-income-room"></div>
+      <div class="big">
+        ¥ <input type="number" id="income-amount" step="0.01" min="0" placeholder="0">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>支付方式</label>
+      <select id="income-payment">
+        <option value="">请选择</option>
+        <option value="微信">微信</option>
+        <option value="支付宝">支付宝</option>
+        <option value="收钱吧">收钱吧</option>
+        <option value="现金">现金</option>
+        <option value="美团">美团</option>
+        <option value="抖音">抖音</option>
+        <option value="其他">其他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>备注（可选）</label>
+      <input type="text" id="income-note" placeholder="如：套餐B、加时等">
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeIncomeModal()">跳过</button>
+      <button class="confirm" onclick="confirmStopTimer()">确认收入 ¥<span id="income-preview">0</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Manual Income -->
+<div class="modal-overlay" id="modal-manual-income">
+  <div class="modal">
+    <h3>记一笔收入</h3>
+    <div class="form-group">
+      <label>金额（元）</label>
+      <input type="number" id="manual-amount" step="0.01" min="0" placeholder="输入金额">
+    </div>
+    <div class="form-group">
+      <label>来源</label>
+      <select id="manual-source">
+        <option value="微信">微信</option>
+        <option value="支付宝">支付宝</option>
+        <option value="收钱吧">收钱吧</option>
+        <option value="现金">现金</option>
+        <option value="美团">美团</option>
+        <option value="抖音">抖音</option>
+        <option value="其他">其他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>备注（可选）</label>
+      <input type="text" id="manual-note" placeholder="如：卖了一瓶水、配件等">
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeModal('modal-manual-income')">取消</button>
+      <button class="confirm" onclick="confirmManualIncome()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile URL Footer -->
+<div id="mobile-footer" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#333;color:#fff;text-align:center;padding:6px 12px;font-size:12px;z-index:150;font-family:monospace">
+  手机同一WiFi访问: <span id="mobile-url"></span>
+</div>
+
+<!-- Sound Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Modal: Edit/Add Room -->
+<div class="modal-overlay" id="modal-room-edit">
+  <div class="modal">
+    <h3 id="room-edit-title">编辑包间</h3>
+    <div class="form-group">
+      <label>包间名称</label>
+      <input type="text" id="room-edit-name" placeholder="如：包间1">
+    </div>
+    <div class="form-group">
+      <label>分类</label>
+      <select id="room-edit-cat">
+        <option value="主机">🎮 主机</option>
+        <option value="游戏">🕹 游戏</option>
+        <option value="桌游">🎲 桌游</option>
+        <option value="拼豆">🧩 拼豆</option>
+        <option value="台球">🎱 台球</option>
+        <option value="茶馆">🍵 茶馆</option>
+        <option value="麻将">🀄 麻将</option>
+        <option value="私人影院">🍿 私人影院</option>
+        <option value="自习室">📚 自习室</option>
+        <option value="其他">💰 其他</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeModal('modal-room-edit')">取消</button>
+      <button class="confirm" onclick="confirmRoomEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ====== State ======
+let currentRoom = null;
+let selectedDuration = 60;
+let pendingStopTimer = null;
+let pendingExtendTimer = null;
+let extendSelectedDuration = 30;
+let soundEnabled = true;
+let audioCtx = null;
+let playInterval = null;
+let currentMode = 'countdown';
+
+// ====== Audio ======
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+// Aggressive audio init: try repeatedly until it works
+function ensureAudio() {
+  initAudio();
+  if (audioCtx && audioCtx.state === 'suspended') {
+    // On iOS, need user gesture. Try to resume every 500ms for 5s.
+    let tries = 0;
+    const iv = setInterval(() => {
+      audioCtx.resume().then(() => {
+        clearInterval(iv);
+      }).catch(() => {});
+      if (++tries > 10) clearInterval(iv);
+    }, 500);
+  }
+}
+
+function playAlertSound(roomName) {
+  // Try native pywebview notification (works even when app is in background)
+  try {
+    if (window.pywebview && window.pywebview.api) {
+      window.pywebview.api.play_alert(roomName);
+    }
+  } catch(e) {
+    console.log('Native alert error:', e);
+  }
+
+  // Also try JS audio as fallback
+  ensureAudio();
+  try {
+    if (!audioCtx) return;
+    const ctx = audioCtx;
+    const now = ctx.currentTime;
+
+    // Loud, noticeable ringing pattern
+    for (let r = 0; r < 4; r++) {
+      const t = now + r * 0.8;
+      [880, 660, 880, 660].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, t + i * 0.18);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.18 + 0.15);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t + i * 0.18);
+        osc.stop(t + i * 0.18 + 0.15);
+      });
+    }
+
+    if (navigator.vibrate) {
+      navigator.vibrate([300, 150, 300, 150, 300, 150, 300]);
+    }
+
+    trySpeak(roomName);
+  } catch(e) {
+    console.log('Audio error:', e);
+  }
+}
+
+function trySpeak(roomName) {
+  try {
+    if (!window.speechSynthesis) return;
+    // Cancel any ongoing speech first
+    window.speechSynthesis.cancel();
+    const msg = new SpeechSynthesisUtterance();
+    msg.text = roomName + '，时间到了';
+    msg.lang = 'zh-CN';
+    msg.rate = 1.0;
+    msg.volume = 1;
+    msg.onerror = () => {}; // Silently fail if speech not available
+    window.speechSynthesis.speak(msg);
+
+    // On some mobile browsers, speech needs re-triggering
+    setTimeout(() => {
+      if (window.speechSynthesis.speaking === false) {
+        try { window.speechSynthesis.speak(msg); } catch(e) {}
+      }
+    }, 500);
+  } catch(e) {
+    console.log('Speech error:', e);
+  }
+}
+
+function playStopSound() {
+  ensureAudio();
+  try {
+    if (!audioCtx) return;
+    const ctx = audioCtx;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 660;
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  } catch(e) {}
+}
+
+// ====== Toast ======
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ====== Modal ======
+function openModal(id) {
+  document.getElementById(id).classList.add('show');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+function showModalIncome() {
+  closeModal('modal-timer');
+  openModal('modal-income');
+}
+
+function closeIncomeModal() {
+  pendingStopTimer = null;
+  closeModal('modal-income');
+}
+
+// ====== Navigation ======
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', function() {
+    switchPage(this.dataset.page);
+  });
+});
+
+function switchPage(page) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.getElementById(`page-${page}`).style.display = 'block';
+
+  if (page === 'dashboard') loadDashboard();
+  if (page === 'timing') loadRooms();
+  if (page === 'records') loadRecords();
+}
+
+// ====== Dashboard ======
+async function loadDashboard() {
+  try {
+    const res = await fetch('/api/stats');
+    const data = await res.json();
+
+    document.getElementById('dash-income').textContent = '¥' + data.today_income.toFixed(2);
+    document.getElementById('dash-income-detail').textContent = `计时 ¥${data.timer_income.toFixed(2)} / 手动 ¥${data.manual_income.toFixed(2)}`;
+    document.getElementById('dash-orders').textContent = data.today_orders;
+    document.getElementById('dash-active').textContent = data.active_count;
+    document.getElementById('dash-total-all').textContent = '¥' + (data.total_income || 0).toFixed(2);
+
+    const bd = document.getElementById('dash-breakdown');
+    if (data.breakdown && data.breakdown.length > 0) {
+      bd.innerHTML = data.breakdown.map(b =>
+        `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f5f5f5">
+          <span>${b.payment_method || '未填写'}</span>
+          <span style="font-weight:600;color:#e74c3c">¥${parseFloat(b.total).toFixed(2)}</span>
+        </div>`
+      ).join('');
+    } else {
+      bd.innerHTML = '<div style="text-align:center;padding:20px 0;color:#ccc">暂无收入记录</div>';
+    }
+  } catch(e) {
+    showToast('加载失败');
+  }
+}
+
+// ====== Rooms ======
+async function loadRooms() {
+  try {
+    const res = await fetch('/api/rooms');
+    const data = await res.json();
+    renderRooms(data.rooms);
+  } catch(e) {
+    showToast('加载包间失败');
+  }
+}
+
+function renderRooms(rooms) {
+  const grid = document.getElementById('room-grid');
+  grid.innerHTML = rooms.map(r => {
+    const at = r.active_timer;
+    let statusClass = 'idle', statusText = '空闲', countdownHtml = '', btnHtml = '', timeInfo = '';
+
+    if (at) {
+      if (at.mode === 'stopwatch') {
+        statusClass = 'active';
+        statusText = '正计时';
+        countdownHtml = `<div class="countdown stopwatch normal" data-mode="stopwatch" data-start="${at.start_time}" data-id="${at.id}">${formatTime(at.elapsed_seconds)}</div>`;
+        btnHtml = `<button class="btn stop" data-room='${JSON.stringify(r).replace(/'/g,"&#39;")}'>结束计时</button>`;
+        timeInfo = `<div class="time-info">开始: ${at.start_time.slice(11,16)}</div>`;
+      } else if (at.overdue) {
+        statusClass = 'overdue';
+        statusText = '已超时';
+        countdownHtml = `<div class="elapsed-display">正计时 <span class="elapsed" data-start="${at.start_time}">${formatTime(at.duration_seconds)}</span></div>
+          <div class="countdown overdue" data-end="${at.end_time}" data-start="${at.start_time}">超时 00:00:00</div>`;
+        btnHtml = `<div style="display:flex;gap:6px">
+          <button class="btn extend-btn" data-room='${JSON.stringify(r).replace(/'/g,"&#39;")}' style="flex:1;background:#4a90d9;color:#fff;padding:10px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">⏱ 续时</button>
+          <button class="btn stop" data-room='${JSON.stringify(r).replace(/'/g,"&#39;")}' style="flex:1">结束</button>
+        </div>`;
+        timeInfo = `<div class="time-info">${at.start_time.slice(11,16)} → ${at.end_time.slice(11,16)}</div>`;
+      } else {
+        statusClass = 'active';
+        statusText = '计时中';
+        countdownHtml = `<div class="elapsed-display">正计时 <span class="elapsed" data-start="${at.start_time}">${formatTime(at.duration_seconds - at.remaining_seconds)}</span></div>
+          <div class="countdown normal" data-end="${at.end_time}" data-start="${at.start_time}" data-id="${at.id}">${formatTime(at.remaining_seconds)}</div>`;
+        btnHtml = `<button class="btn stop" data-room='${JSON.stringify(r).replace(/'/g,"&#39;")}'>结束计时</button>`;
+        timeInfo = `<div class="time-info">${at.start_time.slice(11,16)} → ${at.end_time.slice(11,16)}</div>`;
+      }
+    } else {
+      btnHtml = `<button class="btn start" data-room='${JSON.stringify(r).replace(/'/g,"&#39;")}'>开始计时</button>`;
+    }
+
+    const icon = getCategoryIcon(r.category);
+
+    return `<div class="room-card" data-room-id="${r.id}">
+      <div class="cat-badge">${r.category}</div>
+      <div class="menu-btn" data-id="${r.id}" data-name="${r.name}" data-cat="${r.category}">⋮</div>
+      <div class="card-menu" data-id="${r.id}">
+        <div onclick="editRoom(${r.id})">✏️ 编辑</div>
+        <div class="menu-del" onclick="deleteRoom(${r.id})">🗑 删除</div>
+      </div>
+      <div class="icon">${icon}</div>
+      <div class="name">${r.name}</div>
+      <div class="status ${statusClass}">${statusText}</div>
+      ${countdownHtml}
+      ${timeInfo}
+      ${btnHtml}
+    </div>`;
+  }).join('');
+
+  // Add the "+" card at the end
+  grid.innerHTML += `
+    <div class="add-card room-card" onclick="showAddRoom()">
+      <div style="font-size:40px;margin-bottom:8px">➕</div>
+      <div style="font-size:15px;font-weight:600;color:#999">添加包间</div>
+    </div>`;
+
+  // Attach event listeners
+  grid.querySelectorAll('.btn.start').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const room = JSON.parse(this.dataset.room);
+      currentRoom = room;
+      document.getElementById('timer-note').value = '';
+      document.getElementById('modal-timer-title').textContent = `计时 - ${room.name} (${room.category})`;
+      // Reset to countdown mode (default)
+      if (currentMode === 'stopwatch') {
+        document.getElementById('mode-countdown').click();
+      } else {
+        // Ensure countdown mode UI is correct
+        if (document.getElementById('countdown-options').style.display === 'none') {
+          document.getElementById('mode-countdown').click();
+        }
+      }
+      openModal('modal-timer');
+    });
+  });
+
+  // Extend buttons
+  grid.querySelectorAll('.btn.extend-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const room = JSON.parse(this.dataset.room);
+      const at = room.active_timer;
+      if (!at) return;
+      pendingExtendTimer = at;
+      document.getElementById('modal-extend-title').textContent = `续时 - ${room.name} (${room.category})`;
+      document.querySelectorAll('#modal-extend .duration-btns button').forEach(b => b.classList.remove('selected'));
+      document.querySelector('#modal-extend .duration-btns button[data-min="30"]').classList.add('selected');
+      extendSelectedDuration = 30;
+      document.getElementById('extend-custom').value = '';
+      openModal('modal-extend');
+    });
+  });
+
+  grid.querySelectorAll('.btn.stop, .btn.overdue-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const room = JSON.parse(this.dataset.room);
+      const at = room.active_timer;
+      if (!at) return;
+
+      pendingStopTimer = at;
+      document.getElementById('modal-income-icon').textContent = getCategoryIcon(room.category);
+      document.getElementById('modal-income-room').textContent = `${room.name} (${room.category})`;
+      document.getElementById('income-amount').value = '';
+      document.getElementById('income-payment').value = '';
+      document.getElementById('income-note').value = '';
+      updateIncomePreview();
+
+      if (at.overdue) {
+        document.getElementById('modal-income-title').textContent = '⏰ 时间到！输入收入';
+        playAlertSound(room.name);
+      } else {
+        document.getElementById('modal-income-title').textContent = '结束计时，输入收入';
+        playStopSound();
+      }
+
+      openModal('modal-income');
+    });
+  });
+}
+
+function getCategoryIcon(cat) {
+  const icons = { '主机':'🎮', '游戏':'🕹', '桌游':'🎲', '拼豆':'🧩', '台球':'🎱', '茶馆':'🍵', '麻将':'🀄', '私人影院':'🍿', '自习室':'📚', '其他':'💰' };
+  return icons[cat] || '🎮';
+}
+
+function formatTime(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+// ====== Duration Selection ======
+document.getElementById('duration-btns').addEventListener('click', function(e) {
+  if (e.target.tagName === 'BUTTON') {
+    this.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+    e.target.classList.add('selected');
+    selectedDuration = parseInt(e.target.dataset.min);
+    document.getElementById('custom-duration').value = '';
+  }
+});
+
+document.getElementById('custom-duration').addEventListener('input', function() {
+  if (this.value) {
+    document.getElementById('duration-btns').querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+    selectedDuration = parseInt(this.value);
+  }
+});
+
+// ====== Extend Duration Selection ======
+document.querySelector('#modal-extend .duration-btns').addEventListener('click', function(e) {
+  if (e.target.tagName === 'BUTTON') {
+    this.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+    e.target.classList.add('selected');
+    extendSelectedDuration = parseInt(e.target.dataset.min);
+    document.getElementById('extend-custom').value = '';
+  }
+});
+
+document.getElementById('extend-custom').addEventListener('input', function() {
+  if (this.value) {
+    document.querySelector('#modal-extend .duration-btns button.selected')?.classList.remove('selected');
+    extendSelectedDuration = parseInt(this.value);
+  }
+});
+
+// ====== Mode Toggle ======
+document.getElementById('mode-countdown').addEventListener('click', function() {
+  currentMode = 'countdown';
+  this.style.background = '#e74c3c';
+  this.style.color = '#fff';
+  this.style.border = 'none';
+  const sw = document.getElementById('mode-stopwatch');
+  sw.style.background = '#fff';
+  sw.style.color = '#666';
+  sw.style.border = '2px solid #ddd';
+  document.getElementById('countdown-options').style.display = 'block';
+  document.getElementById('stopwatch-hint').style.display = 'none';
+});
+
+document.getElementById('mode-stopwatch').addEventListener('click', function() {
+  currentMode = 'stopwatch';
+  this.style.background = '#e74c3c';
+  this.style.color = '#fff';
+  this.style.border = 'none';
+  const cd = document.getElementById('mode-countdown');
+  cd.style.background = '#fff';
+  cd.style.color = '#666';
+  cd.style.border = '2px solid #ddd';
+  document.getElementById('countdown-options').style.display = 'none';
+  document.getElementById('stopwatch-hint').style.display = 'block';
+});
+
+// ====== Start Timer ======
+async function confirmStartTimer() {
+  if (!currentRoom) return;
+  const mode = currentMode || 'countdown';
+  const note = document.getElementById('timer-note').value.trim();
+
+  let duration_seconds = 0;
+  if (mode === 'countdown') {
+    const minutes = selectedDuration || 60;
+    if (minutes <= 0) { showToast('请选择时长'); return; }
+    duration_seconds = minutes * 60;
+  }
+
+  try {
+    const res = await fetch('/api/timers/start', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ room_id: currentRoom.id, duration_seconds, note, mode })
+    });
+    const data = await res.json();
+    if (data.error) { showToast(data.error); return; }
+    closeModal('modal-timer');
+    playStopSound();
+    showToast(mode === 'stopwatch' ? '正计时已开始' : '倒计时已开始');
+    loadRooms();
+  } catch(e) {
+    showToast('启动失败');
+  }
+}
+
+// ====== Extend Timer ======
+async function confirmExtend() {
+  if (!pendingExtendTimer) return;
+  const minutes = extendSelectedDuration || 30;
+  if (minutes <= 0) { showToast('请选择时长'); return; }
+
+  try {
+    const res = await fetch('/api/timers/extend', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ timer_id: pendingExtendTimer.id, additional_seconds: minutes * 60 })
+    });
+    const data = await res.json();
+    if (data.error) { showToast(data.error); return; }
+    closeModal('modal-extend');
+    pendingExtendTimer = null;
+    playStopSound();
+    if (data.overtime_deducted > 0) {
+      showToast(`续时 ${minutes} 分钟（扣除超时 ${Math.ceil(data.overtime_deducted/60)} 分钟，实际 ${Math.ceil(data.net_added/60)} 分钟）`);
+    } else {
+      showToast(`已续时 ${minutes} 分钟`);
+    }
+    loadRooms();
+  } catch(e) {
+    showToast('续时失败');
+  }
+}
+
+// ====== Stop Timer ======
+function updateIncomePreview() {
+  const val = parseFloat(document.getElementById('income-amount').value) || 0;
+  document.getElementById('income-preview').textContent = val.toFixed(2);
+}
+
+document.getElementById('income-amount').addEventListener('input', updateIncomePreview);
+
+async function confirmStopTimer() {
+  if (!pendingStopTimer) return;
+  const amount = parseFloat(document.getElementById('income-amount').value) || 0;
+  const payment = document.getElementById('income-payment').value;
+  const note = document.getElementById('income-note').value;
+
+  try {
+    await fetch('/api/timers/stop', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        timer_id: pendingStopTimer.id,
+        amount: amount,
+        payment_method: payment,
+        note: note
+      })
+    });
+    closeIncomeModal();
+    pendingStopTimer = null;
+    showToast(amount > 0 ? `已记录 ¥${amount.toFixed(2)}` : '已结束');
+    loadRooms();
+  } catch(e) {
+    showToast('操作失败');
+  }
+}
+
+// ====== Manual Income ======
+function showIncomeModal() {
+  document.getElementById('manual-amount').value = '';
+  document.getElementById('manual-source').value = '微信';
+  document.getElementById('manual-note').value = '';
+  openModal('modal-manual-income');
+}
+
+async function confirmManualIncome() {
+  const amount = parseFloat(document.getElementById('manual-amount').value);
+  if (!amount || amount <= 0) { showToast('请输入金额'); return; }
+  const source = document.getElementById('manual-source').value;
+  const note = document.getElementById('manual-note').value;
+
+  try {
+    await fetch('/api/income', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ amount, source, note })
+    });
+    closeModal('modal-manual-income');
+    showToast(`已记录收入 ¥${amount.toFixed(2)}`);
+    loadDashboard();
+  } catch(e) {
+    showToast('保存失败');
+  }
+}
+
+// ====== Export & Clear ======
+let dataExported = false;
+let clearBtnTimer = null;
+
+async function exportData() {
+  try {
+    dataExported = true;
+    const btn = document.getElementById('clear-btn');
+    btn.style.display = 'block';
+    // Auto-hide after 60 seconds
+    clearTimeout(clearBtnTimer);
+    clearBtnTimer = setTimeout(() => {
+      btn.style.display = 'none';
+      dataExported = false;
+    }, 60000);
+    const res = await fetch('/api/export/income/save', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) { showToast('导出失败'); return; }
+    showToast(`✅ 已保存到桌面: ${data.filename}`);
+  } catch(e) {
+    showToast('导出失败');
+  }
+}
+
+async function clearExportedData() {
+  if (!dataExported) {
+    showToast('请先导出数据');
+    return;
+  }
+  if (!confirm('确定清空已导出的所有数据？\n\n此操作不可恢复，请确认已经导出并保存好文件。')) {
+    return;
+  }
+  if (!confirm('再次确认：真的要删除所有已导出的收入记录吗？')) {
+    return;
+  }
+  try {
+    clearTimeout(clearBtnTimer);
+    const res = await fetch('/api/export/clear', { method: 'POST' });
+    const data = await res.json();
+    showToast(`已清空 ${data.deleted} 条记录`);
+    document.getElementById('clear-btn').style.display = 'none';
+    dataExported = false;
+    loadDashboard();
+    loadRecords();
+    loadRooms();
+  } catch(e) {
+    showToast('操作失败');
+  }
+}
+
+// ====== Records ======
+async function loadRecords() {
+  try {
+    const res = await fetch('/api/income');
+    const data = await res.json();
+    const list = document.getElementById('records-list');
+
+    if (data.records.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:30px 0;color:#ccc">暂无记录</div>';
+      return;
+    }
+
+    list.innerHTML = data.records.map(r => {
+      const date = r.created_at ? r.created_at.slice(5, 16) : '';
+      const icon = r.type === 'timer' ? '⏱' : '💰';
+      return `<div class="record-item">
+        <div class="left">
+          <div class="name">${icon} <span class="source-text" data-id="${r.id}" data-type="${r.type}">${r.source}</span></div>
+          <div class="meta">${date}${r.note ? ' · ' + r.note : ''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="right">¥${parseFloat(r.amount).toFixed(2)}</div>
+          <span onclick="deleteRecord(${r.id},'${r.type}')" style="color:#ccc;cursor:pointer;font-size:16px;padding:4px">✕</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    showToast('加载记录失败');
+  }
+}
+
+async function deleteRecord(id, type) {
+  if (!confirm('确定删除这条记录？')) return;
+  try {
+    const res = await fetch(`/api/records/${id}?type=${type}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.ok) {
+      showToast('已删除');
+      loadRecords();
+      loadDashboard();
+    }
+  } catch(e) {
+    showToast('删除失败');
+  }
+}
+
+// ====== Source Editor (click to change payment method) ======
+document.getElementById('records-list').addEventListener('click', function(e) {
+  var el = e.target.closest('.source-text');
+  if (el) {
+    e.stopPropagation();
+    var id = parseInt(el.dataset.id);
+    var type = el.dataset.type;
+    var currentSource = el.textContent.trim();
+
+    document.querySelectorAll('.source-editor').forEach(function(s) { s.remove(); });
+
+    var rect = el.getBoundingClientRect();
+    var editor = document.createElement('div');
+    editor.className = 'source-editor';
+    editor.style.cssText = 'position:fixed;top:' + (rect.bottom + 4) + 'px;left:' + Math.max(8, rect.left) + 'px;background:#fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.15);z-index:250;padding:8px;';
+
+    var select = document.createElement('select');
+    var opts = ['微信', '支付宝', '收钱吧', '现金', '美团', '抖音', '其他'];
+    select.innerHTML = '<option value="">请选择</option>';
+    for (var i = 0; i < opts.length; i++) {
+      var sel = (currentSource === opts[i]) ? ' selected' : '';
+      select.innerHTML += '<option value="' + opts[i] + '"' + sel + '>' + opts[i] + '</option>';
+    }
+    if (currentSource !== '未填写' && currentSource !== '手动记入' && opts.indexOf(currentSource) === -1) {
+      select.innerHTML += '<option value="' + currentSource.replace(/"/g, '&quot;') + '" selected>' + currentSource + '</option>';
+    }
+    select.style.cssText = 'padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:6px;width:130px;display:block;outline:none';
+    select.focus();
+
+    var saveBtn = document.createElement('button');
+    saveBtn.textContent = '保存';
+    saveBtn.style.cssText = 'padding:6px 16px;background:#e74c3c;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;width:100%;';
+    saveBtn.onclick = async function() {
+      var newSource = select.value;
+      if (!newSource) { showToast('请选择支付方式'); return; }
+      try {
+        var res = await fetch('/api/records/' + id, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ type: type, source: newSource })
+        });
+        var data = await res.json();
+        if (data.ok) {
+          editor.remove();
+          loadRecords();
+          loadDashboard();
+          showToast('已更新');
+        }
+      } catch(e) {
+        showToast('更新失败');
+      }
+    };
+
+    editor.appendChild(select);
+    editor.appendChild(saveBtn);
+    document.body.appendChild(editor);
+
+    setTimeout(function() {
+      document.addEventListener('click', function closeEditor(ev) {
+        if (!editor.contains(ev.target)) {
+          editor.remove();
+          document.removeEventListener('click', closeEditor);
+        }
+      });
+    }, 0);
+  }
+});
+
+// ====== Room Management ======
+let editingRoomId = null;
+
+// Card menu toggle
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.menu-btn');
+  if (btn) {
+    e.stopPropagation();
+    const id = btn.dataset.id;
+    // Close all other menus
+    document.querySelectorAll('.card-menu.show').forEach(m => {
+      if (m.dataset.id !== id) m.classList.remove('show');
+    });
+    // Toggle this one
+    const menu = document.querySelector(`.card-menu[data-id="${id}"]`);
+    if (menu) menu.classList.toggle('show');
+    return;
+  }
+  // Close all menus when clicking outside
+  document.querySelectorAll('.card-menu.show').forEach(m => m.classList.remove('show'));
+});
+
+function editRoom(id) {
+  document.querySelectorAll('.card-menu.show').forEach(m => m.classList.remove('show'));
+  editingRoomId = id;
+  document.getElementById('room-edit-title').textContent = '编辑包间';
+  const card = document.querySelector(`.room-card[data-room-id="${id}"]`);
+  const name = card ? card.querySelector('.name').textContent : '';
+  const cat = card ? card.querySelector('.cat-badge').textContent : '';
+  document.getElementById('room-edit-name').value = name;
+  document.getElementById('room-edit-cat').value = cat;
+  openModal('modal-room-edit');
+}
+
+function showAddRoom() {
+  editingRoomId = null;
+  document.getElementById('room-edit-title').textContent = '添加包间';
+  document.getElementById('room-edit-name').value = '';
+  document.getElementById('room-edit-cat').value = '主机';
+  openModal('modal-room-edit');
+}
+
+async function confirmRoomEdit() {
+  const name = document.getElementById('room-edit-name').value.trim();
+  const category = document.getElementById('room-edit-cat').value;
+  if (!name) { showToast('请输入包间名称'); return; }
+
+  if (editingRoomId) {
+    await fetch(`/api/rooms/${editingRoomId}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, category: category || '其他' })
+    });
+  } else {
+    await fetch('/api/rooms', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, category: category || '通用' })
+    });
+  }
+  closeModal('modal-room-edit');
+  editingRoomId = null;
+  loadRooms();
+  showToast('已保存');
+}
+
+async function deleteRoom(id) {
+  document.querySelectorAll('.card-menu.show').forEach(m => m.classList.remove('show'));
+  if (!confirm('确定删除这个包间？')) return;
+  await fetch(`/api/rooms/${id}`, { method: 'DELETE' });
+  loadRooms();
+  showToast('已删除');
+}
+
+// ====== Countdown + Elapsed Updater ======
+setInterval(() => {
+  const now = Date.now();
+
+  // Update countdowns and elapsed time
+  document.querySelectorAll('.countdown.normal').forEach(el => {
+    const end = new Date(el.dataset.end).getTime();
+    const start = new Date(el.dataset.start).getTime();
+    const elapsed = Math.floor((now - start) / 1000);
+    const rem = Math.max(0, Math.floor((end - now) / 1000));
+    el.textContent = formatTime(rem);
+
+    // Update elapsed time in the same card
+    const card = el.closest('.room-card');
+    if (card) {
+      const elapsedEl = card.querySelector('.elapsed');
+      if (elapsedEl) elapsedEl.textContent = formatTime(elapsed);
+    }
+
+    if (rem <= 0) {
+      const roomName = card ? card.querySelector('.name').textContent : '';
+      el.classList.remove('normal');
+      el.classList.add('overdue');
+      el.textContent = '超时 ' + formatTime(rem);
+      card.querySelector('.status').className = 'status overdue';
+      card.querySelector('.status').textContent = '已超时';
+
+      // Replace single button with extend + stop buttons
+      const oldBtn = card.querySelector('.btn');
+      if (oldBtn && !card.querySelector('.extend-btn')) {
+        const roomData = oldBtn.dataset.room;
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex;gap:6px';
+        wrap.innerHTML = `
+          <button class="btn extend-btn" data-room='${roomData}' style="flex:1;background:#4a90d9;color:#fff;padding:10px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">⏱ 续时</button>
+          <button class="btn stop" data-room='${roomData}' style="flex:1">结束</button>`;
+        oldBtn.replaceWith(wrap);
+        // Attach event listeners to new buttons
+        wrap.querySelector('.extend-btn').addEventListener('click', function(e) {
+          e.stopPropagation();
+          const r = JSON.parse(this.dataset.room);
+          const t = r.active_timer;
+          if (!t) return;
+          pendingExtendTimer = t;
+          document.getElementById('modal-extend-title').textContent = `续时 - ${r.name} (${r.category})`;
+          document.querySelectorAll('#modal-extend .duration-btns button').forEach(b => b.classList.remove('selected'));
+          document.querySelector('#modal-extend .duration-btns button[data-min="30"]').classList.add('selected');
+          extendSelectedDuration = 30;
+          document.getElementById('extend-custom').value = '';
+          openModal('modal-extend');
+        });
+        wrap.querySelector('.btn.stop').addEventListener('click', function(e) {
+          e.stopPropagation();
+          const r = JSON.parse(this.dataset.room);
+          const t = r.active_timer;
+          if (!t) return;
+          pendingStopTimer = t;
+          document.getElementById('modal-income-icon').textContent = getCategoryIcon(r.category);
+          document.getElementById('modal-income-room').textContent = `${r.name} (${r.category})`;
+          document.getElementById('income-amount').value = '';
+          document.getElementById('income-payment').value = '';
+          document.getElementById('income-note').value = '';
+          updateIncomePreview();
+          document.getElementById('modal-income-title').textContent = `⏰ 时间到！输入收入`;
+          playAlertSound(r.name);
+          openModal('modal-income');
+        });
+      }
+      playAlertSound(roomName);
+      showToast(`⏰ ${roomName} 时间到！`);
+    }
+  });
+
+  // Update stopwatch timers
+  document.querySelectorAll('.countdown.stopwatch').forEach(el => {
+    const start = new Date(el.dataset.start).getTime();
+    const elapsed = Math.max(0, Math.floor((now - start) / 1000));
+    el.textContent = formatTime(elapsed);
+  });
+
+  document.querySelectorAll('.countdown.overdue').forEach(el => {
+    const end = new Date(el.dataset.end).getTime();
+    const start = new Date(el.dataset.start).getTime();
+    const elapsed = Math.floor((now - start) / 1000);
+    const overdue_secs = Math.max(0, Math.floor((now - end) / 1000));
+    el.textContent = '超时 ' + formatTime(overdue_secs);
+
+    // Update elapsed in overdue too
+    const card = el.closest('.room-card');
+    if (card) {
+      const elapsedEl = card.querySelector('.elapsed');
+      if (elapsedEl) elapsedEl.textContent = formatTime(elapsed);
+    }
+  });
+}, 1000);
+
+// ====== Periodic Refresh ======
+setInterval(() => {
+  const active = document.getElementById('page-timing').style.display !== 'none';
+  if (active) loadRooms();
+  if (document.getElementById('page-dashboard').style.display !== 'block') loadDashboard();
+}, 30000);
+
+// ====== Init ======
+switchPage('dashboard');
+
+// Show mobile access URL
+fetch('/api/ip').then(r=>r.json()).then(d=>{
+  document.getElementById('mobile-url').textContent = `http://${d.ip}:5050`;
+  document.getElementById('mobile-footer').style.display = 'block';
+}).catch(()=>{});
+
+// Aggressive audio init on first click
+function bootstrapAudio() {
+  ensureAudio();
+  document.getElementById('audio-status').style.display = 'block';
+  // iOS: try a silent oscillator to unlock audio
+  try {
+    if (audioCtx) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      gain.gain.value = 0.001;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.01);
+    }
+  } catch(e) {}
+  // Try a short test speech
+  try {
+    if (window.speechSynthesis) {
+      const m = new SpeechSynthesisUtterance(' ');
+      m.volume = 0;
+      window.speechSynthesis.speak(m);
+    }
+  } catch(e) {}
+}
+document.addEventListener('click', bootstrapAudio, { once: true });
+document.addEventListener('touchstart', bootstrapAudio, { once: true });
+</script>
+</body>
+</html>
