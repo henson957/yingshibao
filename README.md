@@ -1,18 +1,20 @@
 # 盈时宝计时计费系统 · YingShiBao
 
-> 主机体验店计时收银软件 — 老板专用，简单够用
-> A desktop timing & billing system for console gaming cafes — simple, practical, built by an owner for owners.
+> 通用计时计费系统 — 电玩店 · 网吧 · 自习室 · 棋牌室 · 台球室 · 私人影院 · 茶馆 · 任何按时间收费的场所
+> A universal timing & billing system for any venue that charges by time — built by a shop owner, for shop owners.
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
 ![Flask](https://img.shields.io/badge/Flask-3.x-green)
-![pywebview](https://img.shields.io/badge/pywebview-4.x-orange)
+![pywebview](img.shields.io/badge/pywebview-4.x-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ---
 
 ## 概述 · Overview
 
-盈时宝是为主机体验店（PlayStation / Switch / Xbox 等）量身打造的计时收银系统。它运行在店里的电脑上，店员在电脑上操作，老板用手机在同 WiFi 下也能查看营收。
+盈时宝是一套**通用的计时收银系统**。它不是为某个特定行业写的——只要你的生意是按时间收费的（开个房→计时→收钱），它就能用。
+
+它运行在店里的电脑上，店员在电脑上操作，老板用手机在同 WiFi 下也能查看营收。
 
 - **电脑端**：原生桌面窗口（pywebview）
 - **手机端**：同 WiFi 下浏览器访问电脑 IP 即可
